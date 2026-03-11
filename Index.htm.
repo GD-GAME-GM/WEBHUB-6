@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    
+    <title>WebHub create website</title>
+    
+    <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <style>
+        :root {
+            --google-blue: #1a0dab;
+            --google-gray: #5f6368;
+            --border: #dfe1e5;
+        }
+
+        body { 
+            font-family: 'Roboto', Arial, sans-serif; 
+            margin: 0; 
+            background: #ffffff; 
+            -webkit-tap-highlight-color: transparent;
+            overflow-x: hidden;
+        }
+
+        /* --- Auth Screen Styles --- */
+        #auth-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: white; z-index: 10000; display: flex; flex-direction: column;
+            justify-content: center; align-items: center; padding: 20px; box-sizing: border-box;
+        }
+        .auth-box { width: 100%; max-width: 350px; text-align: center; }
+        .auth-box h2 { color: var(--google-blue); margin-bottom: 20px; }
+        .auth-input { 
+            width: 100%; padding: 12px; margin: 10px 0; border: 1px solid var(--border);
+            border-radius: 8px; outline: none; font-size: 16px; box-sizing: border-box;
+        }
+        .auth-btn {
+            width: 100%; padding: 12px; background: var(--google-blue); color: white;
+            border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 10px;
+        }
+        .auth-toggle { margin-top: 20px; color: var(--google-gray); cursor: pointer; text-decoration: underline; }
+        
+        /* Main UI */
+        #main-content { display: none; }
+        
+        .search-header { 
+            padding: 15px; 
+            border-bottom: 1px solid #eee; 
+            position: sticky; 
+            top: 0; 
+            background: white; 
+            z-index: 100; 
+        }
+        .search-wrapper { position: relative; display: flex; align-items: center; }
+        .search-wrapper i { position: absolute; left: 15px; color: var(--google-gray); }
+        .search-wrapper input { 
+            width: 100%; 
+            padding: 12px 12px 12px 45px; 
+            border-radius: 24px; 
+            border: 1px solid var(--border); 
+            outline: none; 
+            font-size: 16px; 
+        }
+
+        .feed { padding: 15px; padding-bottom: 90px; }
+        .site-card { 
+            display: flex; 
+            align-items: center; 
+            margin-bottom: 22px; 
+            cursor: pointer; 
+            animation: fadeIn 0.3s ease;
+        }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        
+        .site-card img { 
+            width: 48px; 
+            height: 48px; 
+            border-radius: 8px; 
+            margin-right: 15px; 
+            object-fit: cover; 
+            border: 1px solid #f0f0f0;
+        }
+        .site-card .info-box { flex-grow: 1; }
+        .site-card .site-name { color: var(--google-blue); margin: 0; font-size: 18px; font-weight: 400; }
+        .site-card .author-name { color: black; font-size: 12px; font-weight: bold; margin-top: 2px; }
+
+        .nav-bar { 
+            position: fixed; 
+            bottom: 0; 
+            width: 100%; 
+            height: 70px; 
+            background: #fff; 
+            border-top: 1px solid #eee; 
+            display: flex; 
+            justify-content: space-around; 
+            align-items: center; 
+            z-index: 1000;
+        }
+        .nav-item { color: var(--google-gray); font-size: 24px; cursor: pointer; transition: 0.2s; }
+        .nav-item.active { color: #1a73e8; }
+
+        #create-screen { 
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+            background: white; z-index: 2000; padding: 20px; box-sizing: border-box; overflow-y: auto; 
+        }
+        .input-field { margin-bottom: 25px; }
+        .input-field label { display: block; margin-bottom: 8px; font-weight: 600; font-size: 14px; color: #333; }
+        .input-field input, .input-field textarea { 
+            width: 100%; padding: 12px; border: 1px solid #dadce0; border-radius: 4px; box-sizing: border-box; outline: none;
+        }
+
+        #publish-btn, #update-btn { 
+            width: 100%; padding: 15px; color: white; border: none; border-radius: 4px; font-size: 16px; font-weight: bold; cursor: pointer;
+        }
+        #publish-btn { background: #1a73e8; display: none; }
+        #update-btn { background: #34a853; display: none; }
+
+        #viewer { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: white; z-index: 9999; }
+        #viewer iframe { width: 100%; height: 100%; border: none; }
+
+        /* --- Requests Page Style --- */
+        #request-screen {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+            background: white; z-index: 3000; padding: 20px; box-sizing: border-box; overflow-y: auto;
+        }
+        .request-item {
+            padding: 15px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center;
+        }
+        .status-badge { padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: bold; }
+        .status-pending { background: #fff3cd; color: #856404; }
+        .status-expected { background: #d4edda; color: #155724; }
+        .status-rejected { background: #f8d7da; color: #721c24; }
+
+        #admin-panel {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5); z-index: 5000;
+        }
+        .panel-content {
+            background: white; width: 85%; height: 80%; margin: 10% auto;
+            border-radius: 15px; padding: 20px; overflow-y: auto; position: relative;
+        }
+        .admin-item {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 12px; border-bottom: 1px solid #eee;
+        }
+        .admin-btn { padding: 5px 10px; border: none; border-radius: 5px; cursor: pointer; color: white; margin-left: 5px; }
+        .edit-btn { background: #1a73e8; }
+        .delete-btn { background: #d93025; }
+
+        #delete-modal {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8); z-index: 10000; align-items: center; justify-content: center;
+        }
+        .modal-box { background: white; width: 80%; padding: 25px; border-radius: 12px; text-align: center; }
+        .confirm-input { width: 100%; padding: 10px; margin: 15px 0; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; }
+        .modal-btns { display: flex; gap: 10px; justify-content: center; }
+        .m-btn { padding: 10px 20px; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; }
+        .m-cancel { background: #eee; color: #333; }
+        .m-delete { background: #d93025; color: white; }
+
+        .logout-container { margin-top: 40px; padding-bottom: 30px; display: flex; justify-content: flex-start; }
+        .logout-btn { background: none; border: none; color: #d93025; font-size: 16px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 8px; }
+        #logout-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 11000; align-items: center; justify-content: center; }
+        .logout-modal-box { background: white; width: 85%; max-width: 300px; padding: 20px; border-radius: 15px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
+    </style>
+</head>
+<body>
+
+    <div id="auth-screen">
+        <div class="auth-box">
+            <h2 id="auth-title">Sign Up</h2>
+            <input type="text" id="auth-user" class="auth-input" placeholder="Username (Max 12)" maxlength="12">
+            <input type="password" id="auth-pass" class="auth-input" placeholder="Password (Max 12)" maxlength="12">
+            <button class="auth-btn" onclick="handleAuth()" id="auth-action-btn">Create Account</button>
+            <p class="auth-toggle" onclick="toggleAuthMode()" id="auth-toggle-text">Already have an account? Login</p>
+        </div>
+    </div>
+
+    <div id="main-content">
+        <div id="home-page">
+            <div class="search-header">
+                <div class="search-wrapper">
+                    <i class="fa fa-search"></i>
+                    <input type="text" id="search-bar" placeholder="Search by website name...">
+                </div>
+            </div>
+            <div class="feed" id="site-list">
+                <p style='text-align:center; color:#999; margin-top:50px;'>Loading websites...</p>
+            </div>
+        </div>
+
+        <div id="admin-panel">
+            <div class="panel-content">
+                <div style="display:flex; justify-content:space-between; margin-bottom:20px;">
+                    <h3>Manage Your Websites</h3>
+                    <i class="fa fa-times" onclick="toggleAdmin(false)" style="font-size:24px; cursor:pointer;"></i>
+                </div>
+                <div id="admin-list"></div>
+            </div>
+        </div>
+
+        <div id="request-screen">
+            <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2>My Site Status</h2>
+                <i class="fa fa-close" onclick="closeRequests()" style="font-size: 24px; color: #999; cursor:pointer;"></i>
+            </div>
+            <div id="request-list"></div>
+        </div>
+
+        <div id="create-screen">
+            <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+                <h2 id="create-title">Create Website</h2>
+                <div style="display:flex; gap:20px; align-items:center;">
+                    <i class="fa fa-envelope" onclick="openRequests()" style="font-size: 22px; color: #1a73e8; cursor:pointer;"></i>
+                    <i class="fa fa-close" onclick="navigate('home')" style="font-size: 24px; color: #999; cursor:pointer;"></i>
+                </div>
+            </div>
+            <input type="hidden" id="edit-id"> 
+            <div class="input-field">
+                <label><i class="fa fa-image"></i> Icon URL</label>
+                <input type="text" id="site-icon" placeholder="Paste image link here..." oninput="validate()">
+            </div>
+            <div class="input-field">
+                <label><i class="fa fa-pencil"></i> Website Name (Max 20)</label>
+                <input type="text" id="site-name" maxlength="20" placeholder="Enter name..." oninput="validate()">
+            </div>
+            <div class="input-field">
+                <label><i class="fa fa-code"></i> HTML Code</label>
+                <textarea id="site-code" rows="8" placeholder="<html><body>...</body></html>" oninput="validate()"></textarea>
+            </div>
+            <button id="publish-btn" onclick="publish()">Publish Website</button>
+            <button id="update-btn" onclick="saveUpdate()">Update Website</button>
+
+            <div class="logout-container">
+                <button class="logout-btn" onclick="showLogoutConfirm()">
+                    <i class="fa fa-sign-out-alt"></i> Logout WebHub
+                </button>
+            </div>
+        </div>
+
+        <div id="logout-modal">
+            <div class="logout-modal-box">
+                <h3 style="margin-top:0;">Logout?</h3>
+                <p style="color:#666;">do you want to logout</p>
+                <div class="modal-btns">
+                    <button class="m-btn m-cancel" style="flex:1;" onclick="closeLogoutModal()">NO</button>
+                    <button class="m-btn m-delete" style="flex:1; background:#d93025;" onclick="finalLogout()">CONFIRM , LOGOUT</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="delete-modal">
+            <div class="modal-box" id="step-1">
+                <h3 style="color:#d93025">Delete Website?</h3>
+                <p>Are you sure you want to delete this website forever?</p>
+                <div class="modal-btns">
+                    <button class="m-btn m-cancel" onclick="closeDeleteModal()">Cancel</button>
+                    <button class="m-btn m-delete" onclick="showStep2()">Confirm Delete</button>
+                </div>
+            </div>
+            <div class="modal-box" id="step-2" style="display:none;">
+                <h3>Verify Name</h3>
+                <p>Type <b><span id="target-site-name"></span></b> to delete:</p>
+                <input type="text" id="verify-input" class="confirm-input" placeholder="Enter website name...">
+                <div class="modal-btns">
+                    <button class="m-btn m-cancel" onclick="closeDeleteModal()">Cancel</button>
+                    <button class="m-btn m-delete" onclick="finalDelete()">Delete Now</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="viewer">
+            <iframe id="display-frame"></iframe>
+        </div>
+
+        <div class="nav-bar">
+            <div class="nav-item active" id="home-btn" onclick="navigate('home')">
+                <i class="fa fa-home"></i>
+            </div>
+            <div class="nav-item" id="admin-btn" onclick="toggleAdmin(true)">
+                <i class="fa fa-edit"></i>
+            </div>
+            <div class="nav-item" id="create-btn" onclick="navigate('create')">
+                <i class="fa fa-plus-square"></i>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Firebase Config wahi hai jo aapne di
+        const firebaseConfig = {
+
+  apiKey: "AIzaSyCIaUvxEhJ7EBQY5pAH4k7fAGMCKpacYWE",
+  authDomain: "web-hub-6747f.firebaseapp.com",
+  databaseURL: "https://web-hub-6747f-default-rtdb.firebaseio.com",
+  projectId: "web-hub-6747f",
+  storageBucket: "web-hub-6747f.firebasestorage.app",
+  messagingSenderId: "874170827917",
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+        const sitesRef = db.ref('uploaded_sites');
+        const usersRef = db.ref('app_users');
+
+        let allWebsites = [];
+        let isViewing = false; 
+        let currentUser = null;
+        let isSignUpMode = true;
+        let pendingDeleteId = "";
+        let pendingDeleteName = "";
+
+        window.onload = function() {
+            const savedUser = localStorage.getItem('webhub_user');
+            if(savedUser) { loginUser(savedUser); }
+        };
+
+        function toggleAuthMode() {
+            isSignUpMode = !isSignUpMode;
+            document.getElementById('auth-title').innerText = isSignUpMode ? "Sign Up" : "Login";
+            document.getElementById('auth-action-btn').innerText = isSignUpMode ? "Create Account" : "Login Now";
+            document.getElementById('auth-toggle-text').innerText = isSignUpMode ? "Already have an account? Login" : "New here? Create Account";
+        }
+
+        // --- UPDATED AUTH LOGIC ---
+        function handleAuth() {
+            const user = document.getElementById('auth-user').value.trim();
+            const pass = document.getElementById('auth-pass').value.trim();
+            if(user.length < 3 || pass.length < 3) { alert("Min 3 characters required!"); return; }
+            
+            if(isSignUpMode) {
+                // Pehle check karenge ki ye username already database mein hai ya nahi
+                usersRef.child(user).once('value', snap => {
+                    if(snap.exists()) { 
+                        // Agar naam pehle se hai, toh ye message dikhayenge
+                        alert("Change your name, it is already there"); 
+                    }
+                    else { 
+                        // Agar naya naam hai, toh account banayenge
+                        usersRef.child(user).set({ password: pass }).then(() => { 
+                            alert("Account Created!"); 
+                            loginUser(user); 
+                        }); 
+                    }
+                });
+            } else {
+                // Login Mode
+                usersRef.child(user).once('value', snap => {
+                    if(snap.exists() && snap.val().password === pass) { loginUser(user); }
+                    else { alert("Wrong Password!"); }
+                });
+            }
+        }
+
+        function loginUser(username) {
+            currentUser = username;
+            localStorage.setItem('webhub_user', username);
+            document.getElementById('auth-screen').style.display = 'none';
+            document.getElementById('main-content').style.display = 'block';
+        }
+
+        // Baaki ke saare functions (publish, navigate, toggleAdmin, etc.) bilkul wahi hain jo aapne diye the
+        function showLogoutConfirm() { document.getElementById('logout-modal').style.display = 'flex'; }
+        function closeLogoutModal() { document.getElementById('logout-modal').style.display = 'none'; }
+        function finalLogout() { localStorage.removeItem('webhub_user'); location.reload(); }
+
+        function navigate(page) {
+            document.getElementById('home-page').style.display = (page === 'home') ? 'block' : 'none';
+            document.getElementById('create-screen').style.display = (page === 'create') ? 'block' : 'none';
+            document.getElementById('home-btn').classList.toggle('active', page === 'home');
+            document.getElementById('create-btn').classList.toggle('active', page === 'create');
+            if(page !== 'create') {
+                document.getElementById('update-btn').style.display = 'none';
+                document.getElementById('publish-btn').style.display = 'none';
+                document.getElementById('edit-id').value = "";
+                document.getElementById('create-title').innerText = "Create Website";
+                document.getElementById('site-icon').value = '';
+                document.getElementById('site-name').value = '';
+                document.getElementById('site-code').value = '';
+            }
+        }
+
+        function toggleAdmin(show) {
+            if(isViewing) return;
+            const panel = document.getElementById('admin-panel');
+            panel.style.display = show ? 'block' : 'none';
+            if(show) refreshAdminList();
+        }
+
+        function openRequests() {
+            document.getElementById('request-screen').style.display = 'block';
+            const list = document.getElementById('request-list');
+            list.innerHTML = "";
+            const myRequests = allWebsites.filter(s => s.author === currentUser);
+            if(myRequests.length === 0) { list.innerHTML = "<p style='text-align:center; color:#999;'>No history found.</p>"; return; }
+            myRequests.forEach(site => {
+                const item = document.createElement('div');
+                item.className = 'request-item';
+                let statusClass = 'status-pending';
+                let statusText = 'Pending';
+                if(site.status === 'approved') { statusClass = 'status-expected'; statusText = 'Expected'; }
+                if(site.status === 'rejected') { statusClass = 'status-rejected'; statusText = 'Rejected'; }
+                
+                item.innerHTML = `<div><b>${site.name}</b></div><div class="status-badge ${statusClass}">${statusText}</div>`;
+                list.appendChild(item);
+            });
+        }
+function closeRequests() { 
+            document.getElementById('request-screen').style.display = 'none'; 
+       }
+
+        function validate() {
+            const icon = document.getElementById('site-icon').value.trim();
+            const name = document.getElementById('site-name').value.trim();
+            const code = document.getElementById('site-code').value.trim();
+            const editId = document.getElementById('edit-id').value;
+            
+            if(editId) {
+                document.getElementById('update-btn').style.display = (icon && name && code) ? 'block' : 'none';
+                document.getElementById('publish-btn').style.display = 'none';
+            } else {
+                document.getElementById('publish-btn').style.display = (icon && name && code) ? 'block' : 'none';
+                document.getElementById('update-btn').style.display = 'none';
+            }
+        }
+
+        function publish() {
+            const name = document.getElementById('site-name').value;
+            const icon = document.getElementById('site-icon').value;
+            const code = document.getElementById('site-code').value;
+            
+            sitesRef.push({
+                name: name,
+                icon: icon,
+                code: code,
+                author: currentUser,
+                clicks: 0,
+                status: 'pending',
+                timestamp: Date.now()
+            }).then(() => {
+                alert("Website Sent for Approval (Pending)!");
+                navigate('home');
+            });
+        }
+
+        function refreshAdminList() {
+            const list = document.getElementById('admin-list');
+            list.innerHTML = "";
+            const mySites = allWebsites.filter(s => s.author === currentUser);
+            if(mySites.length === 0) {
+                list.innerHTML = "<p style='text-align:center; color:#999;'>You haven't uploaded any sites.</p>";
+                return;
+            }
+            mySites.forEach(site => {
+                const item = document.createElement('div');
+                item.className = 'admin-item';
+                item.innerHTML = `
+                    <span>${site.name}</span>
+                    <div>
+                        <button class="admin-btn edit-btn" onclick="startEdit('${site.id}')">Edit</button>
+                        <button class="admin-btn delete-btn" onclick="openDeleteModal('${site.id}', '${site.name}')">Delete</button>
+                    </div>
+                `;
+                list.appendChild(item);
+            });
+        }
+
+        function openDeleteModal(id, name) {
+            pendingDeleteId = id;
+            pendingDeleteName = name;
+            document.getElementById('delete-modal').style.display = 'flex';
+            document.getElementById('step-1').style.display = 'block';
+            document.getElementById('step-2').style.display = 'none';
+            document.getElementById('verify-input').value = "";
+        }
+
+        function showStep2() {
+            document.getElementById('step-1').style.display = 'none';
+            document.getElementById('step-2').style.display = 'block';
+            document.getElementById('target-site-name').innerText = pendingDeleteName;
+        }
+
+        function closeDeleteModal() {
+            document.getElementById('delete-modal').style.display = 'none';
+        }
+
+        function finalDelete() {
+            if(document.getElementById('verify-input').value.trim() === pendingDeleteName) {
+                sitesRef.child(pendingDeleteId).remove().then(() => {
+                    alert("Deleted!");
+                    closeDeleteModal();
+                    refreshAdminList();
+                });
+            } else {
+                alert("Name did not match!");
+            }
+        }
+
+        function startEdit(id) {
+            const site = allWebsites.find(s => s.id === id);
+            toggleAdmin(false);
+            navigate('create');
+            document.getElementById('create-title').innerText = "Edit Website";
+            document.getElementById('edit-id').value = site.id;
+            document.getElementById('site-icon').value = site.icon;
+            document.getElementById('site-name').value = site.name;
+            document.getElementById('site-code').value = site.code;
+            validate();
+        }
+
+        function saveUpdate() {
+            const id = document.getElementById('edit-id').value;
+            sitesRef.child(id).update({
+                name: document.getElementById('site-name').value,
+                icon: document.getElementById('site-icon').value,
+                code: document.getElementById('site-code').value,
+                status: 'pending' 
+            }).then(() => {
+                alert("Update Sent for Approval! It is now Pending.");
+                navigate('home');
+            });
+        }
+
+        // --- Firebase Realtime Listener ---
+        sitesRef.on('value', snap => {
+            allWebsites = [];
+            snap.forEach(child => {
+                let data = child.val();
+                data.id = child.key;
+                allWebsites.push(data);
+            });
+            allWebsites.sort((a, b) => (b.clicks || 0) - (a.clicks || 0));
+            refreshList();
+        });
+
+        function refreshList(searchTerm = "") {
+            const list = document.getElementById('site-list');
+            list.innerHTML = "";
+            const filtered = allWebsites.filter(s => s.name.toLowerCase().includes(searchTerm.toLowerCase()));
+            
+            filtered.forEach(site => {
+                if(site.status !== 'approved') return;
+
+                const item = document.createElement('div');
+                item.className = 'site-card';
+                item.onclick = () => {
+                    db.ref('uploaded_sites/' + site.id).update({ clicks: (site.clicks || 0) + 1 });
+                    openSite(site.code);
+                };
+                item.innerHTML = `
+                    <img src="${site.icon}" onerror="this.src='https://cdn-icons-png.flaticon.com/512/1243/1243933.png'">
+                    <div class="info-box">
+                        <h3 class="site-name">${site.name}</h3>
+                        <div class="author-name">by ${site.author || 'Anonymous'}</div>
+                    </div>
+                `;
+                list.appendChild(item);
+            });
+        }
+
+        function openSite(code) {
+            isViewing = true;
+            document.getElementById('viewer').style.display = 'block';
+            const doc = document.getElementById('display-frame').contentWindow.document;
+            doc.open(); 
+            doc.write(code); 
+            doc.close();
+            window.history.pushState({isViewing: true}, "");
+        }
+
+        window.onpopstate = function() {
+            isViewing = false;
+            document.getElementById('viewer').style.display = 'none';
+        };
+
+        document.getElementById('search-bar').addEventListener('input', (e) => {
+            refreshList(e.target.value);
+        });
+    </script>
+</body>
+</html>
